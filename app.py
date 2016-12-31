@@ -12,8 +12,8 @@ app = Flask(__name__)
 setting = {
 	'url' : 'https://instachecker.herokuapp.com',
 	'name' : 'InstaChecker',
-	'description' : u'片思い・被片思いアカウントを自動解析し、フォロー・フォロワー管理を楽にするアプリ InstaChecker',
-	'short_description' : u'片思い・被片思いを自動でチェック'
+	'description' : u'片思い・相互フォローを自動解析してアカウント管理を楽にするアプリ InstaChecker',
+	'short_description' : u'片思い・相互フォローを自動でチェック'
 }
 
 app_url = setting['url']
@@ -33,7 +33,6 @@ def auth():
 @app.route('/result')
 def exe():
 	code = request.args.get('code')
-	print code
 	info = StringIO()
 	curl = pycurl.Curl()
 	curl.setopt(pycurl.URL, 'https://api.instagram.com/oauth/access_token')
@@ -53,16 +52,34 @@ def exe():
 	imgs = {}
 	load = json.loads(res)
 	access_token = load['access_token']
+	
 	try:
 		follows = []
 		api = urllib2.urlopen('https://api.instagram.com/v1/users/self/follows?access_token=' + access_token)
 		load = json.loads(api.read())
 		data = load['data']
+		pagination = load['pagination']
+		if(pagination != {}):
+			next_url = pagination['next_url']
 		for i in range(len(data)):
 			follows.append(data[i]['username'])
 			imgs[data[i]['username']] = data[i]['profile_picture']
 	except Exception as e:
 		print(e, 'error to get follows')
+	while(True):
+		if(pagination == {}):
+			break
+		else:
+			api = urllib2.urlopen(next_url)
+			load = json.loads(api.read())
+			data = load['data']
+			pagination = load['pagination']
+			print pagination
+			if(pagination != {}):
+				next_url = pagination['next_url']
+			for i in range(len(data)):
+				follows.append(data[i]['username'])
+				imgs[data[i]['username']] = data[i]['profile_picture']
 	print follows
 	
 	try:
@@ -70,15 +87,33 @@ def exe():
 		api = urllib2.urlopen('https://api.instagram.com/v1/users/self/followed-by?access_token=' + access_token)
 		load = json.loads(api.read())
 		data = load['data']
+		pagination = load['pagination']
+		if(pagination != {}):
+			next_url = pagination['next_url']
 		for i in range(len(data)):
 			followed_by.append(data[i]['username'])
 			imgs[data[i]['username']] = data[i]['profile_picture']
 	except Exception as e:
-		print(e, 'error to get followed by')
+		print(e, 'error to get followed by')	
+	while(True):
+		if(pagination == {}):
+			break
+		else:
+			api = urllib2.urlopen(next_url)
+			load = json.loads(api.read())
+			data = load['data']
+			pagination = load['pagination']
+			if(pagination != {}):
+				next_url = pagination['next_url']
+			for i in range(len(data)):
+				followed_by.append(data[i]['username'])
+			imgs[data[i]['username']] = data[i]['profile_picture']
 	print followed_by
 	
 	num_follows = len(follows)
 	num_followed_by = len(followed_by)
+	
+	print('Follows:' + str(num_follows) + ', Followers:' + str(num_followed_by))
 	
 	follows_and_followed = []
 	not_follows = []
